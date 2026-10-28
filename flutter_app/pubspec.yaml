@@ -1,0 +1,43 @@
+name: liquid_ink
+description: Offline, login-free Markdown reader and editor built with Flutter.
+publish_to: "none"
+version: 2.3.0+5
+
+environment:
+  sdk: ">=3.10.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  file_picker: ^10.3.4
+  path: ^1.9.1
+  path_provider: ^2.1.5
+  scrollable_positioned_list: ^0.3.8
+  shared_preferences: ^2.5.4
+  url_launcher: ^6.3.2
+  highlight: ^0.7.0
+  markdown: ^7.3.1
+  html: ^0.15.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/
+    - assets/glass/
+  shaders:
+    - shaders/liquid_glass.frag
+
+
+# Keep Android plugins on the Pigeon-based versions. Newer Android
+# implementations pull in JNI native assets which require a full NDK/CMake
+# toolchain; Liquid Ink only needs storage and preference primitives.
+dependency_overrides:
+  shared_preferences_android: 2.3.2
+  path_provider_android: 2.2.15

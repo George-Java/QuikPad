@@ -135,7 +135,14 @@ void main() {
     final store = ActionStore();
     await openEditor(tester, store, text: 'hello world\n\nsecond paragraph');
 
-    await tester.tap(find.byTooltip('查找文本'));
+    // Search, settings and fullscreen no longer consume editor chrome space.
+    expect(find.byTooltip('查找文本'), findsNothing);
+    expect(find.byTooltip('阅读外观'), findsNothing);
+    expect(find.byTooltip('专注模式'), findsNothing);
+
+    await tester.tap(find.byTooltip('更多文档操作'));
+    await pumpFor(tester, 400);
+    await tester.tap(find.text('查找文本'));
     await pumpFor(tester, 400);
     await tester.enterText(find.byType(TextField).last, 'world');
     await tester.tap(find.widgetWithText(FilledButton, '查找'));
@@ -145,6 +152,33 @@ void main() {
     expect(field.controller!.text, contains('hello world'));
     expect(field.controller!.selection.start, 6);
     expect(field.controller!.selection.end, 11);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('focus mode needs two back gestures to exit', (tester) async {
+    final store = ActionStore();
+    await openEditor(tester, store);
+
+    await tester.tap(find.byTooltip('更多文档操作'));
+    await pumpFor(tester, 400);
+    await tester.tap(find.text('专注模式'));
+    await pumpFor(tester, 600);
+
+    expect(find.byTooltip('保存'), findsNothing);
+    expect(find.byTooltip('返回'), findsNothing);
+    expect(find.byTooltip('目录大纲'), findsNothing);
+
+    // One back gesture may be accidental: it only arms the exit.
+    await tester.binding.handlePopRoute();
+    await pumpFor(tester, 300);
+    expect(find.text('再按一次返回退出专注模式'), findsOneWidget);
+    expect(find.byTooltip('保存'), findsNothing);
+
+    // The second back inside the window really exits focus mode.
+    await tester.binding.handlePopRoute();
+    await pumpFor(tester, 600);
+    expect(find.byTooltip('保存'), findsOneWidget);
+    expect(find.byTooltip('返回'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

@@ -49,11 +49,12 @@ From this directory, using the local SDK in this workspace:
 ..\.tooling\flutter-sdk\flutter\bin\flutter.bat build apk --release
 ```
 
-Current result: `flutter analyze` 0 issues; `flutter test` 68 passed, 1 skipped
+Current result: `flutter analyze` 0 issues; `flutter test` 69 passed, 1 skipped
 (the host does not expose Impeller shader image filters). Coverage includes
 atomic and serialized document saves, editor dialog lifecycle, task-line
 provenance in quotes and code fences, image decode aspect ratio, normal-IME
-flags for Android skins that otherwise raise a black secure keyboard, large-text
+flags for Android skins that otherwise raise a black secure keyboard, the
+editor toolbar relocation and two-back focus-mode exit, large-text
 accessibility layout, and the existing parser/scroll/glass suites. The release
 build was installed and exercised over USB on a physical PLQ110 (Android 17);
 ZMR traces are under `traces/` and ignored by git.

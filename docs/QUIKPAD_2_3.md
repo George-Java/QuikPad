@@ -122,7 +122,7 @@ cd flutter_app
 ```
 
 - analyze：0 issues
-- test：68 passed，1 skipped（宿主不暴露 Impeller shader image filter）
+- test：69 passed，1 skipped（宿主不暴露 Impeller shader image filter）
 - build：release APK，Android Debug 证书签名；已通过 USB 安装到 PLQ110（Android 17）
 
 > 维护修复：查找/重命名/新建对话框改为由对话框 State 持有控制器；图片解码改用
@@ -131,9 +131,11 @@ cd flutter_app
 > 并发保存；相同名称重命名不再产生副本；玻璃菜单补透明 Material 层并限制高度；
 > 首页按钮适配 2×–3× 字体；Android 关闭 Auto Backup；大文档字数统计改为防抖 +
 > isolate。OPPO/OnePlus 会把“无建议”输入框当成密码并拉起全屏黑色安全键盘，
-> 新建/查找/重命名/源码编辑统一改用普通 IME（保留关闭智能引号）。对应测试新增
+> 新建/查找/重命名/源码编辑统一改用普通 IME（保留关闭智能引号）。编辑器底部不再
+> 放搜索、设置、全屏按钮：查找和专注模式移入右上角“更多”；专注模式隐藏上下栏，
+> 2 秒内连续两次返回才退出，第一次只提示，防止误触。对应测试新增
 > `document_store_test.dart`、`editor_actions_test.dart` 及大字号/任务行号/图片比例/
-> 并发保存/普通 IME 标记断言。
+> 并发保存/普通 IME 标记/专注模式两次返回断言。
 >
 > 真机验收（PLQ110）：ZMR 0.2.18 三个场景 passed；新建/查找/重命名键盘、源码输入、
 > `> - [ ]` 引用任务勾选、关联目录后 300×1200 竖图按 1:4 显示、1.5× 字体首页、
@@ -141,8 +143,8 @@ cd flutter_app
 
 产物：GitHub Releases `v2.3.0` 资产 `QuikPad-2.3.0-fixed.apk`
 （https://github.com/George-Java/QuikPad/releases/download/v2.3.0/QuikPad-2.3.0-fixed.apk）
-大小：61,621,069 bytes（约 58.8 MiB）
-SHA-256：`547E6545E0D1E0B93AEE8D1395AF06B45A37C30A5B30D4BF9D205FFCF1ED0F2B`
+大小：61,621,029 bytes（约 58.8 MiB）
+SHA-256：`3194463BBB96BC3BEF1D660D0AED934A62174E8B306063FA7A3739136338A4B2`
 （修复前的 `dist/QuikPad-2.3.0.apk` 保留用于对比；fixed 资产不进入 Git 树）
 
 ## 6. 边界

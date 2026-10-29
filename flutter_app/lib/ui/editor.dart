@@ -15,8 +15,6 @@ import '../widgets/glass.dart';
 import '../widgets/source_editor.dart';
 import 'outline_sheet.dart';
 import 'preview.dart';
-import 'routes.dart';
-import 'settings_screen.dart';
 import 'sheets.dart';
 
 enum EditorMode { source, live, preview }
@@ -53,6 +51,9 @@ class _EditorScreenState extends State<EditorScreen>
   Timer? _autoSaveTimer;
   EditorMode _mode = EditorMode.preview;
   bool _focusMode = false;
+  Timer? _focusExitTimer;
+  bool _focusExitArmed = false;
+  static const _focusExitWindow = Duration(seconds: 2);
   bool _parsing = false;
   bool _parseRunning = false;
   bool _saving = false;
@@ -288,7 +289,14 @@ class _EditorScreenState extends State<EditorScreen>
   Future<void> _handleBack() async {
     if (_leaving || _deleting) return;
     if (_focusMode) {
-      setState(() => _focusMode = false);
+      // A single back gesture is easy to trigger by accident. Arm the exit and
+      // only leave focus mode when the user confirms with a second back inside
+      // the short window.
+      if (_focusExitArmed) {
+        _exitFocusMode();
+      } else {
+        _armFocusExit();
+      }
       return;
     }
     _leaving = true;
@@ -305,16 +313,44 @@ class _EditorScreenState extends State<EditorScreen>
     Navigator.of(context).pop(true);
   }
 
-  Future<void> _openSettings() async {
-    _editorFocus.unfocus();
-    final animate = motionOf(context);
-    await Navigator.of(context).push<void>(
-      liquidRoute<void>(
-        builder: (_) => SettingsScreen(controller: widget.settings),
-        animate: animate,
-      ),
-    );
-    if (mounted) setState(() {});
+  void _armFocusExit() {
+    _focusExitTimer?.cancel();
+    _focusExitArmed = true;
+    _focusExitTimer = Timer(_focusExitWindow, () {
+      _focusExitArmed = false;
+    });
+    ScaffoldMessenger.of(context)
+      ..removeCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('再按一次返回退出专注模式'),
+          duration: _focusExitWindow,
+        ),
+      );
+  }
+
+  void _exitFocusMode() {
+    _focusExitTimer?.cancel();
+    _focusExitTimer = null;
+    _focusExitArmed = false;
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).removeCurrentSnackBar();
+    setState(() => _focusMode = false);
+  }
+
+  void _enterFocusMode() {
+    _focusExitTimer?.cancel();
+    _focusExitTimer = null;
+    _focusExitArmed = false;
+    setState(() => _focusMode = true);
+    ScaffoldMessenger.of(context)
+      ..removeCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('专注模式：连续按两次返回退出'),
+          duration: _focusExitWindow,
+        ),
+      );
   }
 
   Future<void> _openOutline() async {
@@ -355,6 +391,16 @@ class _EditorScreenState extends State<EditorScreen>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     ListTile(
+                      leading: Icon(Icons.search, color: scheme.primary),
+                      title: const Text('查找文本'),
+                      onTap: () => Navigator.of(context).pop('search'),
+                    ),
+                    ListTile(
+                      leading: Icon(Icons.fullscreen, color: scheme.primary),
+                      title: const Text('专注模式'),
+                      onTap: () => Navigator.of(context).pop('focus'),
+                    ),
+                    ListTile(
                       leading: Icon(Icons.ios_share, color: scheme.primary),
                       title: const Text('导出 / 另存为'),
                       onTap: () => Navigator.of(context).pop('export'),
@@ -391,7 +437,11 @@ class _EditorScreenState extends State<EditorScreen>
       ),
     );
     if (!mounted || action == null) return;
-    if (action == 'export') {
+    if (action == 'search') {
+      await _openSearch();
+    } else if (action == 'focus') {
+      _enterFocusMode();
+    } else if (action == 'export') {
       await _export();
     } else if (action == 'rename') {
       await _rename();
@@ -710,6 +760,7 @@ class _EditorScreenState extends State<EditorScreen>
     _parseTimer?.cancel();
     _autoSaveTimer?.cancel();
     _statsTimer?.cancel();
+    _focusExitTimer?.cancel();
     _stats.dispose();
     _controller.removeListener(_onTextChanged);
     _controller.dispose();
@@ -737,25 +788,18 @@ class _EditorScreenState extends State<EditorScreen>
                 if (!_focusMode) _buildTopBar(context),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                    padding: EdgeInsets.fromLTRB(
+                      _focusMode ? 8 : 12,
+                      4,
+                      _focusMode ? 8 : 12,
+                      4,
+                    ),
                     child: _mode == EditorMode.preview
                         ? _buildPreview()
                         : _buildEditingArea(),
                   ),
                 ),
                 if (!_focusMode) _buildBottom(scheme),
-                if (_focusMode)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: GlassIconButton(
-                        icon: Icons.fullscreen_exit,
-                        tooltip: '退出专注模式',
-                        onPressed: () => setState(() => _focusMode = false),
-                      ),
-                    ),
-                  ),
               ],
             ),
           ),
@@ -1002,46 +1046,25 @@ class _EditorScreenState extends State<EditorScreen>
                         onSelected: (mode) => setState(() => _mode = mode),
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    GlassIconButton(
-                      icon: _focusMode
-                          ? Icons.fullscreen_exit
-                          : Icons.fullscreen,
-                      tooltip: _focusMode ? '退出专注' : '专注模式',
-                      onPressed: () => setState(() => _focusMode = !_focusMode),
-                    ),
                   ],
                 ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ValueListenableBuilder<String>(
-                        valueListenable: _stats,
-                        builder: (context, stats, child) => Padding(
-                          padding: const EdgeInsets.only(left: 10),
-                          child: Text(
-                            stats,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: scheme.onSurfaceVariant,
-                              fontSize: 11.5,
-                            ),
-                          ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 2, 10, 0),
+                  child: ValueListenableBuilder<String>(
+                    valueListenable: _stats,
+                    builder: (context, stats, child) => Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        stats,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: scheme.onSurfaceVariant,
+                          fontSize: 11.5,
                         ),
                       ),
                     ),
-                    GlassIconButton(
-                      icon: Icons.search,
-                      tooltip: '查找文本',
-                      onPressed: _openSearch,
-                    ),
-                    GlassIconButton(
-                      icon: Icons.palette_outlined,
-                      tooltip: '阅读外观',
-                      onPressed: _openSettings,
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),

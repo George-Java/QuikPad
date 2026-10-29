@@ -5,6 +5,7 @@ import '../core/settings.dart';
 import '../widgets/glass.dart';
 import 'editor.dart';
 import 'routes.dart';
+import 'sheets.dart';
 import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -82,34 +83,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _create() async {
-    final controller = TextEditingController();
-    final name = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('新建 Markdown'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          textInputAction: TextInputAction.done,
-          decoration: const InputDecoration(
-            labelText: '文件名',
-            hintText: '例如：今天的想法.md',
-          ),
-          onSubmitted: (value) => Navigator.of(context).pop(value),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text),
-            child: const Text('创建'),
-          ),
-        ],
-      ),
+    final name = await showTextPromptDialog(
+      context,
+      title: '新建 Markdown',
+      labelText: '文件名',
+      hintText: '例如：今天的想法.md',
+      confirmLabel: '创建',
     );
-    controller.dispose();
     if (name == null || name.trim().isEmpty || !mounted) return;
     try {
       final document = await widget.store.createDocument(
@@ -380,19 +360,39 @@ class _HeroCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: GlassButton(
-                  label: '打开文件',
-                  icon: Icons.folder_open_outlined,
-                  expanded: true,
-                  onPressed: onImport,
-                ),
-              ),
-              const SizedBox(width: 10),
-              GlassButton(label: '新建', icon: Icons.add, onPressed: onCreate),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              // Two side-by-side actions stop fitting once the system text
+              // scale grows or the phone is narrow. Stack them instead of
+              // overflowing the hero card.
+              final textScale = MediaQuery.textScalerOf(context).scale(15) / 15;
+              final stack = textScale > 1.35 || constraints.maxWidth < 260;
+              final open = GlassButton(
+                label: '打开文件',
+                icon: Icons.folder_open_outlined,
+                expanded: true,
+                onPressed: onImport,
+              );
+              final create = GlassButton(
+                label: '新建',
+                icon: Icons.add,
+                expanded: stack,
+                onPressed: onCreate,
+              );
+              if (stack) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [open, const SizedBox(height: 10), create],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: open),
+                  const SizedBox(width: 10),
+                  create,
+                ],
+              );
+            },
           ),
         ],
       ),

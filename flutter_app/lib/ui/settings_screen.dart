@@ -325,7 +325,7 @@ class _SettingsCard extends StatelessWidget {
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: child,
+      child: Material(type: MaterialType.transparency, child: child),
     );
   }
 }

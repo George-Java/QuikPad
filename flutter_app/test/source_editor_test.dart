@@ -17,6 +17,11 @@ void main() {
         ),
       );
       final field = find.byType(TextField);
+      // OPPO/OnePlus treats no-suggestion fields as secure password inputs and
+      // replaces the whole screen with a black secure keyboard.
+      final fieldWidget = tester.widget<TextField>(field);
+      expect(fieldWidget.autocorrect, isTrue);
+      expect(fieldWidget.enableSuggestions, isTrue);
       String pageText() => tester.widget<TextField>(field).controller!.text;
       final first = pageText();
       await tester.enterText(field, '${first}INSERT');

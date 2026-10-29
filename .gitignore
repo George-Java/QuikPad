@@ -8,3 +8,6 @@ captures/
 .externalNativeBuild/
 .cxx/
 .DS_Store
+
+# Release binaries are published as GitHub Release assets, not committed.
+dist/*.apk

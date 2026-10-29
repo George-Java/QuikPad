@@ -83,6 +83,43 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('home hero and cards survive a 2x accessibility text scale', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(640, 1280);
+    tester.view.devicePixelRatio = 2;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    SharedPreferences.setMockInitialValues({});
+    final settings = SettingsController(await SharedPreferences.getInstance())
+      ..setGlassEffectsEnabled(false)
+      ..setAnimationsEnabled(false);
+    final store = _FakeStore(
+      DocumentMeta(
+        path: '/tmp/accessibility.md',
+        name: 'a very long document name that should stay inside its card.md',
+        modified: DateTime(2026, 10, 27, 12, 30),
+        size: 4096,
+      ),
+    );
+
+    await tester.pumpWidget(
+      GlassScope(
+        settings: settings.value,
+        child: MaterialApp(
+          theme: buildInkTheme(brightness: Brightness.light),
+          home: HomeScreen(store: store, settings: settings),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.takeException(), isNull);
+    settings.dispose();
+  });
+
   testWidgets('app root boots with localizations and no network', (
     tester,
   ) async {
@@ -106,7 +143,9 @@ void main() {
     );
 
     settings.setGlassEffectsEnabled(true);
-    if (Platform.environment['QUIKPAD_DARK'] == '1') settings.setThemeMode(AppThemeMode.dark);
+    if (Platform.environment['QUIKPAD_DARK'] == '1') {
+      settings.setThemeMode(AppThemeMode.dark);
+    }
     await tester.runAsync(GlassResources.load);
     final key = GlobalKey();
     await tester.pumpWidget(
@@ -125,6 +164,7 @@ void main() {
       final image = render.toImageSync();
       await tester.runAsync(() async {
         final png = await image.toByteData(format: ui.ImageByteFormat.png);
+        await Directory('../.tooling').create(recursive: true);
         await File(
           '../.tooling/quikpad-home.png',
         ).writeAsBytes(png!.buffer.asUint8List());

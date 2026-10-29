@@ -51,12 +51,12 @@ void main() {
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(recorder);
       canvas.drawRect(
-        const Rect.fromLTWH(0, 0, 2400, 2400),
+        const Rect.fromLTWH(0, 0, 2400, 1200),
         Paint()..color = Colors.blue,
       );
       final picture = recorder.endRecording();
       final bitmap = (await tester.runAsync(
-        () => picture.toImage(2400, 2400),
+        () => picture.toImage(2400, 1200),
       ))!;
       final data = await tester.runAsync(
         () => bitmap.toByteData(format: ui.ImageByteFormat.png),
@@ -104,6 +104,9 @@ void main() {
       });
       expect(size!.width, lessThanOrEqualTo(1536));
       expect(size.height, lessThanOrEqualTo(1024));
+      // Decoding must preserve the 2:1 source ratio; exact-policy resizing
+      // squashed it into the screen-width x 260dp box.
+      expect(size.width / size.height, closeTo(2, 0.01));
     },
   );
   testWidgets('long code is bounded while scrolling and reaching the end', (

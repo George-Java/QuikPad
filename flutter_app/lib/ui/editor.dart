@@ -56,12 +56,14 @@ class _EditorScreenState extends State<EditorScreen>
   bool _parsing = false;
   bool _parseRunning = false;
   bool _saving = false;
+  int _saveDepth = 0;
+  Future<void> _saveLock = Future<void>.value();
   bool _leaving = false;
   bool _deleting = false;
   String? _parseError;
   int _parseEpoch = 0;
-  String? _statsSource;
-  String _cachedStats = '';
+  Timer? _statsTimer;
+  final ValueNotifier<String> _stats = ValueNotifier<String>('0 字 · 1 行');
 
   @override
   void initState() {
@@ -79,6 +81,42 @@ class _EditorScreenState extends State<EditorScreen>
     if (_doc.text.length > 160000) {
       _scheduleParse(immediate: true);
     }
+    // Counting CJK characters and words is three whole-document regex scans.
+    // A megabyte-sized note takes long enough that doing it inside every
+    // keystroke's build would visibly stall typing, so large documents show a
+    // placeholder and are counted after the user pauses.
+    if (_doc.text.length <= 100000) {
+      _stats.value = _statsForText(_doc.text);
+    } else {
+      _stats.value = '统计中…';
+      _statsTimer = Timer(_statsDelay, () => unawaited(_refreshStats()));
+    }
+  }
+
+  static const _statsDelay = Duration(milliseconds: 180);
+
+  void _scheduleStats() {
+    _statsTimer?.cancel();
+    if (_controller.text.trim().isEmpty) {
+      _stats.value = '0 字 · 1 行';
+      return;
+    }
+    _statsTimer = Timer(_statsDelay, () => unawaited(_refreshStats()));
+  }
+
+  Future<void> _refreshStats() async {
+    final text = _controller.text;
+    String stats;
+    try {
+      stats = text.length > 200000
+          ? await compute(_statsForText, text)
+          : _statsForText(text);
+    } catch (_) {
+      // Word counting is cosmetic; never let it surface as an unhandled error.
+      return;
+    }
+    if (!mounted || _controller.text != text) return;
+    _stats.value = stats;
   }
 
   MarkdownDocument _initialParse(String text) {
@@ -113,6 +151,7 @@ class _EditorScreenState extends State<EditorScreen>
     } else {
       _scheduleParse();
     }
+    _scheduleStats();
     _scheduleAutoSave();
   }
 
@@ -188,24 +227,44 @@ class _EditorScreenState extends State<EditorScreen>
 
   Future<void> _save({bool showMessage = false}) async {
     if (_deleting) return;
-    final text = _controller.text;
-    if (text == _lastSavedText) {
-      if (showMessage && mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('文档已保存')));
+    if (_controller.text == _lastSavedText) {
+      // Even a "nothing new" save must let an in-flight write settle: it can
+      // be writing an older revision, and claiming saved before it completes
+      // would let a revert be overwritten on disk.
+      await _saveLock;
+      if (!mounted) return;
+      if (_controller.text == _lastSavedText) {
+        if (showMessage) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('文档已保存')));
+        }
+        return;
       }
-      return;
     }
-    while (_saving) {
-      await Future<void>.delayed(const Duration(milliseconds: 40));
-    }
+    // Serialize writes. Two callers (lifecycle, auto-save, manual save) waking
+    // together used to write the same atomic-save temporary file concurrently.
+    final previous = _saveLock;
+    final gate = Completer<void>();
+    _saveLock = gate.future;
+    _saveDepth++;
     _saving = true;
     if (mounted) setState(() {});
     try {
-      await widget.store.saveDocument(_doc.copyWith(text: text));
-      if (_controller.text == text) {
-        _lastSavedText = text;
+      await previous;
+      if (_deleting) return;
+      // Coalesce queued saves onto the text that is current now. Writing the
+      // snapshot captured when this save was queued could resurrect an older
+      // revision after the user reverted to the already-saved text.
+      final latest = _controller.text;
+      if (latest == _lastSavedText) return;
+      await widget.store.saveDocument(_doc.copyWith(text: latest));
+      _lastSavedText = latest;
+      if (mounted && _controller.text != latest) {
+        // The document changed while the write was in flight (a revert or more
+        // typing). The disk now holds `latest`; queue a follow-up so the newer
+        // text is not silently lost.
+        unawaited(_save());
       }
       if (showMessage && mounted) {
         ScaffoldMessenger.of(
@@ -219,13 +278,15 @@ class _EditorScreenState extends State<EditorScreen>
         ).showSnackBar(const SnackBar(content: Text('保存失败，请重试')));
       }
     } finally {
-      _saving = false;
+      gate.complete();
+      _saveDepth--;
+      if (_saveDepth == 0) _saving = false;
       if (mounted) setState(() {});
     }
   }
 
   Future<void> _handleBack() async {
-    if (_leaving) return;
+    if (_leaving || _deleting) return;
     if (_focusMode) {
       setState(() => _focusMode = false);
       return;
@@ -284,35 +345,46 @@ class _EditorScreenState extends State<EditorScreen>
           child: GlassPanel(
             borderRadius: 26,
             padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: Icon(Icons.ios_share, color: scheme.primary),
-                  title: const Text('导出 / 另存为'),
-                  onTap: () => Navigator.of(context).pop('export'),
+            child: SingleChildScrollView(
+              child: Material(
+                // Material must sit below the glass surface's DecoratedBox;
+                // otherwise ListTile ink/background paints behind it and Flutter
+                // reports that splash feedback is invisible.
+                type: MaterialType.transparency,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      leading: Icon(Icons.ios_share, color: scheme.primary),
+                      title: const Text('导出 / 另存为'),
+                      onTap: () => Navigator.of(context).pop('export'),
+                    ),
+                    if (defaultTargetPlatform == TargetPlatform.android)
+                      ListTile(
+                        leading: Icon(Icons.folder_open, color: scheme.primary),
+                        title: const Text('关联图片目录'),
+                        subtitle: const Text('选择 Markdown 文件所在文件夹'),
+                        onTap: () => Navigator.of(context).pop('assets'),
+                      ),
+                    ListTile(
+                      leading: Icon(
+                        Icons.drive_file_rename_outline,
+                        color: scheme.primary,
+                      ),
+                      title: const Text('重命名'),
+                      onTap: () => Navigator.of(context).pop('rename'),
+                    ),
+                    ListTile(
+                      leading: Icon(Icons.delete_outline, color: scheme.error),
+                      title: Text(
+                        '删除本地副本',
+                        style: TextStyle(color: scheme.error),
+                      ),
+                      onTap: () => Navigator.of(context).pop('delete'),
+                    ),
+                  ],
                 ),
-                if (defaultTargetPlatform == TargetPlatform.android)
-                  ListTile(
-                    leading: Icon(Icons.folder_open, color: scheme.primary),
-                    title: const Text('关联图片目录'),
-                    subtitle: const Text('选择 Markdown 文件所在文件夹'),
-                    onTap: () => Navigator.of(context).pop('assets'),
-                  ),
-                ListTile(
-                  leading: Icon(
-                    Icons.drive_file_rename_outline,
-                    color: scheme.primary,
-                  ),
-                  title: const Text('重命名'),
-                  onTap: () => Navigator.of(context).pop('rename'),
-                ),
-                ListTile(
-                  leading: Icon(Icons.delete_outline, color: scheme.error),
-                  title: Text('删除本地副本', style: TextStyle(color: scheme.error)),
-                  onTap: () => Navigator.of(context).pop('delete'),
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -357,39 +429,21 @@ class _EditorScreenState extends State<EditorScreen>
     _autoSaveTimer?.cancel();
     await _save(showMessage: false);
     if (!mounted) return;
-    final controller = TextEditingController(
-      text: _doc.name.replaceFirst(RegExp(r'\.(md|markdown|txt)$'), ''),
-    );
-    final newName = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('重命名文档'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          textInputAction: TextInputAction.done,
-          decoration: const InputDecoration(
-            labelText: '文件名',
-            hintText: '例如：读书笔记.md',
-          ),
-          onSubmitted: (value) => Navigator.of(context).pop(value),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-            child: const Text('重命名'),
-          ),
-        ],
+    final newName = await showTextPromptDialog(
+      context,
+      title: '重命名文档',
+      labelText: '文件名',
+      hintText: '例如：读书笔记.md',
+      initialText: _doc.name.replaceFirst(
+        RegExp(r'\.(md|markdown|txt)$', caseSensitive: false),
+        '',
       ),
+      confirmLabel: '重命名',
     );
-    controller.dispose();
-    if (newName == null || newName.isEmpty || !mounted) return;
+    if (newName == null || newName.trim().isEmpty || !mounted) return;
     try {
       final path = await widget.store.renameDocument(_doc, newName);
+      if (!mounted) return;
       setState(() {
         _doc = _doc.copyWith(
           path: path,
@@ -426,9 +480,10 @@ class _EditorScreenState extends State<EditorScreen>
     if (confirmed != true || !mounted) return;
     _deleting = true;
     _autoSaveTimer?.cancel();
-    while (_saving) {
-      await Future<void>.delayed(const Duration(milliseconds: 40));
-    }
+    // Wait for every queued write. Saves that were already queued re-check
+    // _deleting after the previous gate and skip, so the file cannot be
+    // recreated after this point.
+    await _saveLock;
     await widget.store.deleteDocument(_doc);
     if (mounted) Navigator.of(context).pop(true);
   }
@@ -441,14 +496,15 @@ class _EditorScreenState extends State<EditorScreen>
       } catch (_) {
         // Keep the literal anchor for providers that write a raw '%' path.
       }
-      final target = _parsed.anchors[anchor] ??
+      final target =
+          _parsed.anchors[anchor] ??
           _parsed.anchors[anchor.toLowerCase()] ??
           _parsed.anchors[anchor.toLowerCase().replaceAll(' ', '-')];
       if (target == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('没有找到锚点：$anchor')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('没有找到锚点：$anchor')));
         }
         return;
       }
@@ -473,7 +529,12 @@ class _EditorScreenState extends State<EditorScreen>
       }
       return;
     }
-    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    var opened = false;
+    try {
+      opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      opened = false;
+    }
     if (!opened && mounted) {
       ScaffoldMessenger.of(
         context,
@@ -513,19 +574,24 @@ class _EditorScreenState extends State<EditorScreen>
   void _toggleTask(ListItemBlock block) {
     final text = _controller.text;
     final lines = text.split('\n');
-    if (block.line < 0 || block.line >= lines.length) return;
+    if (!block.hasSourceLine || block.line >= lines.length) return;
     final original = lines[block.line];
     final mark = block.checked == true ? '[ ]' : '[x]';
     final updated = original.replaceFirst(RegExp(r'\[[ xX]\]'), mark);
     if (updated == original) return;
     lines[block.line] = updated;
     final newText = lines.join('\n');
-    final offset = _controller.selection.baseOffset
+    final previousSelection = _controller.selection;
+    final offset = previousSelection.baseOffset
         .clamp(0, newText.length)
         .toInt();
     _controller.value = TextEditingValue(
       text: newText,
-      selection: TextSelection.collapsed(offset: offset),
+      // A preview-only edit has no valid source cursor; preserve the invalid
+      // selection instead of yanking the eventual source caret to offset 0.
+      selection: previousSelection.isValid
+          ? TextSelection.collapsed(offset: offset)
+          : previousSelection,
     );
   }
 
@@ -608,31 +674,13 @@ class _EditorScreenState extends State<EditorScreen>
   }
 
   Future<void> _openSearch() async {
-    final queryController = TextEditingController();
-    final query = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('查找文本'),
-        content: TextField(
-          controller: queryController,
-          autofocus: true,
-          textInputAction: TextInputAction.search,
-          decoration: const InputDecoration(hintText: '输入要查找的内容'),
-          onSubmitted: (value) => Navigator.of(context).pop(value),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(queryController.text),
-            child: const Text('查找'),
-          ),
-        ],
-      ),
+    final query = await showTextPromptDialog(
+      context,
+      title: '查找文本',
+      hintText: '输入要查找的内容',
+      confirmLabel: '查找',
+      textInputAction: TextInputAction.search,
     );
-    queryController.dispose();
     if (query == null || query.isEmpty || !mounted) return;
     final text = _controller.text;
     final from = _controller.selection.end.clamp(0, text.length).toInt();
@@ -648,6 +696,7 @@ class _EditorScreenState extends State<EditorScreen>
     }
     setState(() => _mode = EditorMode.source);
     await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
     _controller.selection = TextSelection(
       baseOffset: index,
       extentOffset: index + query.length,
@@ -655,24 +704,13 @@ class _EditorScreenState extends State<EditorScreen>
     _editorFocus.requestFocus();
   }
 
-  String _statsText(String text) {
-    if (text == _statsSource) return _cachedStats;
-    final trimmed = text.trim();
-    if (trimmed.isEmpty) return '0 字 · 1 行';
-    final lines = '\n'.allMatches(text).length + 1;
-    final cjk = RegExp(r'[\u3400-\u9fff]').allMatches(text).length;
-    final words = RegExp(r'[A-Za-z0-9_]+').allMatches(text).length;
-    final units = cjk + words;
-    final minutes = math.max(1, (units / 400).ceil());
-    _statsSource = text;
-    return _cachedStats = '$units 字 · $lines 行 · $minutes 分钟';
-  }
-
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _parseTimer?.cancel();
     _autoSaveTimer?.cancel();
+    _statsTimer?.cancel();
+    _stats.dispose();
     _controller.removeListener(_onTextChanged);
     _controller.dispose();
     _editorFocus.dispose();
@@ -895,10 +933,10 @@ class _EditorScreenState extends State<EditorScreen>
                 ),
                 const Spacer(),
                 Flexible(
-                  child: ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: _controller,
-                    builder: (context, value, child) => Text(
-                      _statsText(value.text),
+                  child: ValueListenableBuilder<String>(
+                    valueListenable: _stats,
+                    builder: (context, stats, child) => Text(
+                      stats,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -977,12 +1015,12 @@ class _EditorScreenState extends State<EditorScreen>
                 Row(
                   children: [
                     Expanded(
-                      child: ValueListenableBuilder<TextEditingValue>(
-                        valueListenable: _controller,
-                        builder: (context, value, child) => Padding(
+                      child: ValueListenableBuilder<String>(
+                        valueListenable: _stats,
+                        builder: (context, stats, child) => Padding(
                           padding: const EdgeInsets.only(left: 10),
                           child: Text(
-                            _statsText(value.text),
+                            stats,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -1076,4 +1114,15 @@ class _EditorScreenState extends State<EditorScreen>
       ),
     );
   }
+}
+
+String _statsForText(String text) {
+  final trimmed = text.trim();
+  if (trimmed.isEmpty) return '0 字 · 1 行';
+  final lines = '\n'.allMatches(text).length + 1;
+  final cjk = RegExp(r'[\u3400-\u9fff]').allMatches(text).length;
+  final words = RegExp(r'[A-Za-z0-9_]+').allMatches(text).length;
+  final units = cjk + words;
+  final minutes = math.max(1, (units / 400).ceil());
+  return '$units 字 · $lines 行 · $minutes 分钟';
 }

@@ -298,6 +298,17 @@ class GlassButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final labelText = Text(
+      label,
+      textAlign: TextAlign.center,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: scheme.onPrimaryContainer,
+        fontWeight: FontWeight.w600,
+        fontSize: 15,
+      ),
+    );
     final content = Row(
       mainAxisSize: expanded ? MainAxisSize.max : MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
@@ -306,14 +317,10 @@ class GlassButton extends StatelessWidget {
           Icon(icon, size: 19, color: scheme.onPrimaryContainer),
           const SizedBox(width: 8),
         ],
-        Text(
-          label,
-          style: TextStyle(
-            color: scheme.onPrimaryContainer,
-            fontWeight: FontWeight.w600,
-            fontSize: 15,
-          ),
-        ),
+        // An expanded button receives a bounded width and must be allowed to
+        // ellipsize; otherwise a long label or a large text scale overflows the
+        // Row (and the home hero card) instead of shrinking.
+        if (expanded) Flexible(child: labelText) else labelText,
       ],
     );
     return GlassPanel(
@@ -374,47 +381,52 @@ class GlassSegmentedControl<T> extends StatelessWidget {
           color: scheme.outlineVariant.withValues(alpha: 0.35),
         ),
       ),
-      child: Row(
-        children: [
-          for (final value in values)
-            Expanded(
-              child: Semantics(
-                button: true,
-                selected: value == selected,
-                label: labelOf(value),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(13),
-                  onTap: () => onSelected(value),
-                  child: AnimatedContainer(
-                    duration: motion
-                        ? const Duration(milliseconds: 180)
-                        : Duration.zero,
-                    curve: Curves.easeOut,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: value == selected
-                          ? scheme.primary.withValues(alpha: 0.16)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(13),
-                    ),
-                    child: Text(
-                      labelOf(value),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
+      child: Material(
+        type: MaterialType.transparency,
+        child: Row(
+          children: [
+            for (final value in values)
+              Expanded(
+                child: Semantics(
+                  button: true,
+                  selected: value == selected,
+                  label: labelOf(value),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(13),
+                    onTap: () => onSelected(value),
+                    child: AnimatedContainer(
+                      duration: motion
+                          ? const Duration(milliseconds: 180)
+                          : Duration.zero,
+                      curve: Curves.easeOut,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
                         color: value == selected
-                            ? scheme.primary
-                            : scheme.onSurfaceVariant,
-                        fontWeight: value == selected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        fontSize: 13,
+                            ? scheme.primary.withValues(alpha: 0.16)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                      child: Text(
+                        labelOf(value),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: value == selected
+                              ? scheme.primary
+                              : scheme.onSurfaceVariant,
+                          fontWeight: value == selected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

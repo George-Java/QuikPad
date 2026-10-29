@@ -188,8 +188,12 @@ class _SourceEditorState extends State<SourceEditor> {
             minLines: null,
             textAlignVertical: TextAlignVertical.top,
             keyboardType: TextInputType.multiline,
-            autocorrect: false,
-            enableSuggestions: false,
+            autocorrect: true,
+            enableSuggestions: true,
+            // iOS smart punctuation rewrites quotes and dashes, which changes
+            // Markdown (links, code fences, front matter) as the user types.
+            smartQuotesType: SmartQuotesType.disabled,
+            smartDashesType: SmartDashesType.disabled,
             style: TextStyle(
               color: scheme.onSurface,
               fontFamily: 'monospace',

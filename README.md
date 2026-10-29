@@ -64,6 +64,19 @@ Android 的 SAF 单文件授权通常不允许读取同级文件；如果直接�
 
 代码围栏语言别名会归一化（`c`→C++ 语法、`html`→XML 语法、`sh`/`shell`→Bash 等），标题显示友好的语言名。未知语言保持原样显示，不丢字符。
 
+## 本轮稳定性修复
+
+- **原生编辑对话框**：查找、重命名、新建共用 `showTextPromptDialog`，由对话框自身持有并释放 `TextEditingController`。此前在 `showDialog` 返回后立刻 dispose，而退出动画中的 `TextField` 仍持有控制器，会触发 “A TextEditingController was used after being disposed”。
+- **图片比例**：解码改用 `ResizeImagePolicy.fit`，宽高上限只做边界，不再把竖向/方形图片压进屏幕宽 × 260dp 的固定比例；所有 Markdown 图片统一 `BoxFit.contain`，不裁切。
+- **任务勾选行号**：任务定位支持引用块（`> - [ ]`）、嵌套列表，以及跳过围栏代码中的假任务行；定位时同时校验任务文本（含实体/转义），避免 HTML 复选框或相邻任务劫持行号；无法确认时放弃修改而不是改错行。
+- **保存一致性**：先写 `.saving` 临时文件再重命名覆盖，进程在写入中被杀不会留下截断的唯一副本；同名重命名成为无操作，不再生成 `-2` 副本；编辑器对并发/排队的保存串行化，并在写入过程中文本被改回时补写磁盘状态。
+- **对话框/菜单水波纹**：玻璃面板内部的 `ListTile`、目录行和分段控件补上透明 `Material` 层，修复 Flutter 的 “ink splashes may be invisible” 断言并恢复点击反馈；文档菜单可纵向滚动。
+- **无障碍大字号**：首页英雄区按钮在文字放大或窄屏时改为纵向排列，按钮标签可省略；320dp 宽度 / 2×–3× 字体下无 RenderFlex 溢出。
+- **移动端输入**：源码编辑器和文件名/查找输入框关闭 iOS 智能引号与破折号替换，避免把 Markdown 引号改成弯引号；同时保留系统输入法的建议/纠错标记。OPPO/OnePlus 会把“无建议”文本框识别成安全密码输入并拉起全屏黑色安全键盘，真机验收时新建、查找、重命名和源码编辑均因它整屏变黑；现在使用普通 IME，键盘与编辑器正常显示。
+- **弹层高度**：底部玻璃弹层最高占屏幕 86% 并内部滚动，文档菜单的“删除本地副本”不再被屏幕底边裁掉。
+- **启动与编辑保护**：外链打开、剪贴板复制、异步重命名/统计增加异常与 `mounted` 保护；字数统计对大文档改为防抖 + isolate 计算，避免每次按键同步扫描整篇文本。
+- **本地隐私**：Android 关闭 Auto Backup，防止系统云备份把“只在本机”的文档副本上传。
+
 ## 主要能力
 
 - 源码 / 实时分栏 / 预览三种模式。
@@ -85,14 +98,22 @@ cd flutter_app
 ```
 
 - `flutter analyze`：**0 issues**
-- `flutter test`：**51 passed，1 skipped**
+- `flutter test`：**68 passed，1 skipped**
   - 1 个 skipped 是宿主不暴露 Impeller shader image filter，不是应用失败。
-  - 覆盖 1200+ 块目录跳转、900 项列表、长代码、长段落、长表格、源码分段编辑、HTML 头/链接/锚点、图片相对路径、20+ 代码语言、暗色玻璃边缘与非交互卡片稳定性。
-- Release APK：`dist/QuikPad-2.3.0.apk`
+  - 覆盖 1200+ 块目录跳转、900 项列表、长代码、长段落、长表格、源码分段编辑、HTML 头/链接/锚点、图片相对路径与宽高比、任务勾选行号（引用/代码围栏/嵌套任务）、原生编辑器对话框生命周期、原子保存与并发保存、20+ 代码语言、暗色玻璃边缘与非交互卡片稳定性。
+- Release APK：[QuikPad-2.3.0-fixed.apk](https://github.com/George-Java/QuikPad/releases/download/v2.3.0/QuikPad-2.3.0-fixed.apk)（GitHub Releases，真机验收构建）
 - 包名：`com.yg.liquidink`
 - 版本：`2.3.0 (5)`
-- 大小：61,586,445 bytes（约 58.7 MiB）
-- SHA-256：`F5359446A00AE713873D13525D5D22E5AA4458A37FA07D10F66C181933168432`
+- 大小：61,621,069 bytes（约 58.8 MiB）
+- SHA-256：`547E6545E0D1E0B93AEE8D1395AF06B45A37C30A5B30D4BF9D205FFCF1ED0F2B`
+
+## 真机验收
+
+- 设备：`PLQ110`（Android 17，1272×2800，USB 连接）。
+- 安装：从 Releases 下载 `QuikPad-2.3.0-fixed.apk`，再执行 `adb install -r QuikPad-2.3.0-fixed.apk`。
+- Zeno Mobile Runner 0.2.18（从源码构建的 Windows `zmr.exe`）：3 个场景在物理设备上 `passed`，含 launch、healthy、snapshot、点按和返回；trace 位于 `flutter_app/traces/zmr-phone*`。
+- 手工验收：新建/查找/重命名窗口与键盘正常；源码编辑可输入；`> - [ ]` 引用任务只改自己的 `[x]`（`task-test.md` 验证）；关联 Markdown 目录后 300×1200 竖图按 1:4 显示；1.5× 系统字体首页无溢出；删除文档返回首页。
+- 注意：`dist/QuikPad-2.3.0.apk` 是修复前构建，保留用于对比；`QuikPad-2.3.0-fixed.apk` 作为 Releases 资产，不进入 Git；`traces/` 含手机截图，已在 `flutter_app/.gitignore` 中忽略。
 
 ## 目录
 

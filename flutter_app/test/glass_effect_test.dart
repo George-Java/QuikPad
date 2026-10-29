@@ -11,35 +11,63 @@ import 'package:liquid_ink/widgets/glass_effect.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('dark neutral backdrop does not acquire green seams at transparent texture edges', () async {
-    await GlassResources.load();
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    canvas.drawRect(const Rect.fromLTWH(0, 0, 224, 256), Paint()..color = const Color(0xFF202020));
-    final picture = recorder.endRecording();
-    final background = await picture.toImage(256, 256);
-    picture.dispose();
-    final shader = GlassResources.program!.fragmentShader()
-      ..setFloat(0, 256)..setFloat(1, 256)
-      ..setImageSampler(0, background)
-      ..setImageSampler(1, GlassResources.maps[GlassRefractionMode.standard]!);
-    configureGlassShader(shader, bounds: const Rect.fromLTWH(0, 0, 256, 256),
-      pixelRatio: 1, optics: const GlassOptics(saturation: 1), overLight: false);
-    final output = ui.PictureRecorder();
-    Canvas(output).drawRect(const Rect.fromLTWH(0, 0, 256, 256), Paint()..shader = shader);
-    final rendered = output.endRecording();
-    final image = await rendered.toImage(256, 256);
-    final pixels = (await image.toByteData())!.buffer.asUint8List();
-    final png = await image.toByteData(format: ui.ImageByteFormat.png);
-    await File('../.tooling/dark-alpha-seam.png').writeAsBytes(png!.buffer.asUint8List());
-    var worst = 0;
-    for (var i = 0; i < pixels.length; i += 4) {
-      final difference = (pixels[i] - pixels[i + 1]).abs();
-      if (difference > worst) worst = difference;
-    }
-    image.dispose(); rendered.dispose(); shader.dispose(); background.dispose();
-    expect(worst, lessThanOrEqualTo(1), reason: 'Neutral dark input must stay neutral where channel samples hit transparent edges');
-  });
+  test(
+    'dark neutral backdrop does not acquire green seams at transparent texture edges',
+    () async {
+      await GlassResources.load();
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      canvas.drawRect(
+        const Rect.fromLTWH(0, 0, 224, 256),
+        Paint()..color = const Color(0xFF202020),
+      );
+      final picture = recorder.endRecording();
+      final background = await picture.toImage(256, 256);
+      picture.dispose();
+      final shader = GlassResources.program!.fragmentShader()
+        ..setFloat(0, 256)
+        ..setFloat(1, 256)
+        ..setImageSampler(0, background)
+        ..setImageSampler(
+          1,
+          GlassResources.maps[GlassRefractionMode.standard]!,
+        );
+      configureGlassShader(
+        shader,
+        bounds: const Rect.fromLTWH(0, 0, 256, 256),
+        pixelRatio: 1,
+        optics: const GlassOptics(saturation: 1),
+        overLight: false,
+      );
+      final output = ui.PictureRecorder();
+      Canvas(
+        output,
+      ).drawRect(const Rect.fromLTWH(0, 0, 256, 256), Paint()..shader = shader);
+      final rendered = output.endRecording();
+      final image = await rendered.toImage(256, 256);
+      final pixels = (await image.toByteData())!.buffer.asUint8List();
+      final png = await image.toByteData(format: ui.ImageByteFormat.png);
+      await Directory('../.tooling').create(recursive: true);
+      await File(
+        '../.tooling/dark-alpha-seam.png',
+      ).writeAsBytes(png!.buffer.asUint8List());
+      var worst = 0;
+      for (var i = 0; i < pixels.length; i += 4) {
+        final difference = (pixels[i] - pixels[i + 1]).abs();
+        if (difference > worst) worst = difference;
+      }
+      image.dispose();
+      rendered.dispose();
+      shader.dispose();
+      background.dispose();
+      expect(
+        worst,
+        lessThanOrEqualTo(1),
+        reason:
+            'Neutral dark input must stay neutral where channel samples hit transparent edges',
+      );
+    },
+  );
 
   test('reference defaults and deformation retain upstream behavior', () {
     const optics = GlassOptics();
@@ -141,6 +169,7 @@ void main() {
           final png = await chromatic.toByteData(
             format: ui.ImageByteFormat.png,
           );
+          await Directory('../.tooling').create(recursive: true);
           await File(
             '../.tooling/quikpad-${mode.name}.png',
           ).writeAsBytes(png!.buffer.asUint8List());
@@ -277,6 +306,9 @@ void main() {
     // Interior grid colors must be affected by the actual backdrop filter.
     expect(channel(70, 70, 2), isNot(160));
     if (Platform.environment['QUIKPAD_VISUALS'] == '1') {
+      await tester.runAsync(
+        () => Directory('../.tooling').create(recursive: true),
+      );
       await tester.runAsync(
         () => File(
           '../.tooling/quikpad-backdrop.png',

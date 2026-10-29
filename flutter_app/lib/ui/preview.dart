@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
@@ -35,7 +34,10 @@ class MarkdownPreviewPane extends StatefulWidget {
 
 class MarkdownPreviewPaneState extends State<MarkdownPreviewPane> {
   int _imageRevision = 0;
-  void reloadImages() => setState(() => _imageRevision++);
+  void reloadImages() {
+    if (mounted) setState(() => _imageRevision++);
+  }
+
   late List<PreviewItem> _items;
   late List<int> _blockStarts;
 
@@ -167,6 +169,7 @@ class MarkdownPreviewPaneState extends State<MarkdownPreviewPane> {
       data: pageTheme,
       child: DocumentImageScope(
         basePath: widget.basePath,
+        onImagesReload: reloadImages,
         child: Semantics(container: true, label: 'Markdown 预览', child: surface),
       ),
     );
@@ -295,14 +298,15 @@ class _BlockView extends StatelessWidget {
     }
 
     if (block is ListItemBlock) {
+      final task = original as ListItemBlock;
       return _ListLine(
         block: block,
         palette: palette,
         onLinkTap: onLinkTap,
         onFootnoteTap: onFootnoteTap,
-        onToggleTask: onToggleTask == null
+        onToggleTask: onToggleTask == null || !task.hasSourceLine
             ? null
-            : (_) => onToggleTask!(original as ListItemBlock),
+            : (_) => onToggleTask!(task),
       );
     }
 
@@ -573,11 +577,16 @@ class _CodeView extends StatelessWidget {
                       minHeight: 36,
                     ),
                     onPressed: () async {
-                      await Clipboard.setData(ClipboardData(text: copyText));
+                      var copied = true;
+                      try {
+                        await Clipboard.setData(ClipboardData(text: copyText));
+                      } catch (_) {
+                        copied = false;
+                      }
                       if (context.mounted) {
-                        ScaffoldMessenger.of(
-                          context,
-                        ).showSnackBar(const SnackBar(content: Text('代码已复制')));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(copied ? '代码已复制' : '无法访问剪贴板')),
+                        );
                       }
                     },
                     icon: Icon(Icons.copy_rounded, color: palette.secondary),
@@ -733,4 +742,3 @@ class _TableRowView extends StatelessWidget {
     );
   }
 }
-

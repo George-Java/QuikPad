@@ -49,9 +49,16 @@ From this directory, using the local SDK in this workspace:
 ..\.tooling\flutter-sdk\flutter\bin\flutter.bat build apk --release
 ```
 
-Current result: `flutter analyze` 0 issues; `flutter test` 51 passed, 1 skipped
-(the host does not expose Impeller shader image filters).
+Current result: `flutter analyze` 0 issues; `flutter test` 68 passed, 1 skipped
+(the host does not expose Impeller shader image filters). Coverage includes
+atomic and serialized document saves, editor dialog lifecycle, task-line
+provenance in quotes and code fences, image decode aspect ratio, normal-IME
+flags for Android skins that otherwise raise a black secure keyboard, large-text
+accessibility layout, and the existing parser/scroll/glass suites. The release
+build was installed and exercised over USB on a physical PLQ110 (Android 17);
+ZMR traces are under `traces/` and ignored by git.
 
-The release APK is published at `../dist/QuikPad-2.3.0.apk`.
+The release APK is published as a GitHub Releases asset:
+https://github.com/George-Java/QuikPad/releases/download/v2.3.0/QuikPad-2.3.0-fixed.apk
 See `../docs/QUIKPAD_2_3.md` for the edge-line root cause, HTML/image/highlighting
 details, and device acceptance notes.

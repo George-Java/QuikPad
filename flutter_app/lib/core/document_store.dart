@@ -120,8 +120,16 @@ class DocumentStore {
     final name = await _uniqueName(_safeName(picked.name), directory);
     final file = File(p.join(directory.path, name));
     await file.writeAsString(text, flush: true);
-    await DocumentAssets.record(file.path, originalUri: picked.identifier,
-      originalPath: picked.path);
+    try {
+      await DocumentAssets.record(
+        file.path,
+        originalUri: picked.identifier,
+        originalPath: picked.path,
+      );
+    } catch (_) {
+      // The working copy exists; losing provenance only limits relative-image
+      // lookup and must not turn a successful import into an error.
+    }
     return NoteDocument(path: file.path, name: name, text: text);
   }
 
@@ -160,16 +168,48 @@ class DocumentStore {
   }
 
   Future<void> saveDocument(NoteDocument document) async {
-    await File(document.path).writeAsString(document.text, flush: true);
+    // Write then rename: a process kill during writeAsString must not leave the
+    // only copy of the document truncated. The side file is ignored by
+    // listDocuments and replaced on the next save.
+    final temporary = File('${document.path}.saving');
+    try {
+      await temporary.writeAsString(document.text, flush: true);
+      await temporary.rename(document.path);
+    } catch (_) {
+      try {
+        if (await temporary.exists()) await temporary.delete();
+      } catch (_) {
+        // The save error below is the useful one.
+      }
+      rethrow;
+    }
   }
 
   Future<String> renameDocument(NoteDocument document, String name) async {
     final directory = await _documentsDirectory();
-    final safe = await _uniqueName(_safeName(name), directory);
+    final safe = _safeName(name);
     final target = File(p.join(directory.path, safe));
-    await File(document.path).rename(target.path);
-    await DocumentAssets.move(document.path, target.path);
-    return target.path;
+    // Confirming the current name must not create a "-2" duplicate (and must
+    // not rename the file out from under the open editor).
+    if (p.equals(target.path, document.path)) return document.path;
+    final unique = await _uniqueName(safe, directory);
+    final uniqueTarget = File(p.join(directory.path, unique));
+    await File(document.path).rename(uniqueTarget.path);
+    // A previous interrupted save left an ignored partial file; it must not
+    // linger under the old name after the document moved.
+    final saving = File('${document.path}.saving');
+    try {
+      if (await saving.exists()) await saving.delete();
+    } catch (_) {
+      // Best effort; the document itself has already moved.
+    }
+    try {
+      await DocumentAssets.move(document.path, uniqueTarget.path);
+    } catch (_) {
+      // The document itself moved; do not fail the rename (and leave the
+      // editor pointing at a path that no longer exists) over sidecar metadata.
+    }
+    return uniqueTarget.path;
   }
 
   Future<void> deleteDocument(NoteDocument document) async {
@@ -177,7 +217,18 @@ class DocumentStore {
     if (await file.exists()) {
       await file.delete();
     }
-    await DocumentAssets.remove(document.path);
+    final saving = File('${document.path}.saving');
+    try {
+      if (await saving.exists()) await saving.delete();
+    } catch (_) {
+      // The document was removed; do not fail on an orphaned partial file.
+    }
+    try {
+      await DocumentAssets.remove(document.path);
+    } catch (_) {
+      // The file is already gone; a locked sidecar must not report the delete
+      // as failed and strand the editor.
+    }
   }
 
   Future<String?> exportDocument(NoteDocument document) async {

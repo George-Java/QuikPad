@@ -60,6 +60,11 @@ class ListItemBlock extends MdBlock {
   final int depth;
   final String text;
   final bool? checked;
+
+  /// Whether this task's exact source line is known. HTML checkbox lists have
+  /// no Markdown task marker in the source, so [line] is -1 and must not be
+  /// edited through the preview checkbox.
+  bool get hasSourceLine => line >= 0;
 }
 
 class TableAlignment {

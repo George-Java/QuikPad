@@ -4,11 +4,7 @@ import '../markdown/model.dart';
 import '../widgets/glass.dart';
 
 class OutlineSheet extends StatelessWidget {
-  const OutlineSheet({
-    super.key,
-    required this.entries,
-    required this.parsing,
-  });
+  const OutlineSheet({super.key, required this.entries, required this.parsing});
 
   final List<OutlineEntry> entries;
   final bool parsing;
@@ -27,72 +23,73 @@ class OutlineSheet extends StatelessWidget {
             constraints: BoxConstraints(
               maxHeight: MediaQuery.sizeOf(context).height * 0.68,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 6, 4, 4),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '目录',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleLarge
-                                  ?.copyWith(fontWeight: FontWeight.w700),
-                            ),
-                            Text(
-                              entries.isEmpty
-                                  ? (parsing ? '正在解析标题…' : '当前文档没有 H1–H3 标题')
-                                  : '${entries.length} 个标题',
-                              style: TextStyle(
-                                color: scheme.onSurfaceVariant,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      GlassIconButton(
-                        icon: Icons.close,
-                        tooltip: '关闭目录',
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 12),
-                if (entries.isEmpty)
+            child: Material(
+              type: MaterialType.transparency,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 36,
-                    ),
-                    child: Text(
-                      parsing ? '正在解析标题…' : '当前文档没有 H1–H3 标题',
-                      style: TextStyle(color: scheme.onSurfaceVariant),
-                    ),
-                  )
-                else
-                  Flexible(
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
-                      itemCount: entries.length,
-                      itemBuilder: (context, index) {
-                        final entry = entries[index];
-                        return _OutlineRow(
-                          entry: entry,
-                          onTap: () => Navigator.of(context).pop(entry),
-                        );
-                      },
+                    padding: const EdgeInsets.fromLTRB(12, 6, 4, 4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '目录',
+                                style: Theme.of(context).textTheme.titleLarge
+                                    ?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                              Text(
+                                entries.isEmpty
+                                    ? (parsing ? '正在解析标题…' : '当前文档没有 H1–H3 标题')
+                                    : '${entries.length} 个标题',
+                                style: TextStyle(
+                                  color: scheme.onSurfaceVariant,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        GlassIconButton(
+                          icon: Icons.close,
+                          tooltip: '关闭目录',
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
                     ),
                   ),
-              ],
+                  const Divider(height: 12),
+                  if (entries.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 36,
+                      ),
+                      child: Text(
+                        parsing ? '正在解析标题…' : '当前文档没有 H1–H3 标题',
+                        style: TextStyle(color: scheme.onSurfaceVariant),
+                      ),
+                    )
+                  else
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+                        itemCount: entries.length,
+                        itemBuilder: (context, index) {
+                          final entry = entries[index];
+                          return _OutlineRow(
+                            entry: entry,
+                            onTap: () => Navigator.of(context).pop(entry),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),

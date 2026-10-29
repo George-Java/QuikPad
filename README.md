@@ -113,7 +113,7 @@ cd flutter_app
 - 设备：`PLQ110`（Android 17，1272×2800，USB 连接）。
 - 安装：从 Releases 下载 `QuikPad-2.3.0-fixed.apk`，再执行 `adb install -r QuikPad-2.3.0-fixed.apk`。
 - Zeno Mobile Runner 0.2.18（从源码构建的 Windows `zmr.exe`）：3 个场景在物理设备上 `passed`，含 launch、healthy、snapshot、点按和返回；trace 位于 `flutter_app/traces/zmr-phone*`。
-- 手工验收：新建/查找/重命名窗口与键盘正常；源码编辑可输入；`> - [ ]` 引用任务只改自己的 `[x]`（`task-test.md` 验证）；关联 Markdown 目录后 300×1200 竖图按 1:4 显示；1.5× 系统字体首页无溢出；删除文档返回首页。
+- 手工验收：新建/查找/重命名窗口与键盘正常；源码编辑可输入；`> - [ ]` 引用任务只改自己的 `[x]`（`task-test.md` 验证）；关联 Markdown 目录后 300×1200 竖图按 1:4 显示；1.5× 系统字体首页无溢出；查找与专注模式从右上角菜单进入，专注模式第一次返回只提示、第二次返回退出；删除文档返回首页。
 - 注意：`dist/QuikPad-2.3.0.apk` 是修复前构建，保留用于对比；`QuikPad-2.3.0-fixed.apk` 作为 Releases 资产，不进入 Git；`traces/` 含手机截图，已在 `flutter_app/.gitignore` 中忽略。
 
 ## 目录

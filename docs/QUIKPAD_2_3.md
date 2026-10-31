@@ -116,9 +116,9 @@ objc/objective-c -> objectivec                  toml -> ini
 
 ```bash
 cd flutter_app
-..\.tooling\flutter-sdk\flutter\bin\flutter.bat analyze
-..\.tooling\flutter-sdk\flutter\bin\flutter.bat test
-..\.tooling\flutter-sdk\flutter\bin\flutter.bat build apk --release
+flutter analyze
+flutter test
+flutter build apk --release
 ```
 
 - analyze：0 issues

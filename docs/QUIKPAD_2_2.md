@@ -55,9 +55,9 @@ python flutter_app/tool/prepare_brand_assets.py
 在 `flutter_app/` 下执行：
 
 ```powershell
-..\.tooling\flutter-sdk\flutter\bin\flutter.bat analyze --no-pub
-..\.tooling\flutter-sdk\flutter\bin\flutter.bat test --no-pub --enable-impeller
-..\.tooling\flutter-sdk\flutter\bin\flutter.bat build apk --release --no-pub
+flutter analyze --no-pub
+flutter test --no-pub --enable-impeller
+flutter build apk --release --no-pub
 ```
 
 静态分析零问题；**35 项测试通过**，包括原长文档测试及新增的真实片元 shader 输出、RGB 色散、Impeller 背景滤镜裁剪、嵌套滤镜数量、关闭玻璃、减少动态效果和尺寸变化。

@@ -1,7 +1,7 @@
 name: liquid_ink
 description: Offline, login-free Markdown reader and editor built with Flutter.
 publish_to: "none"
-version: 2.3.0+5
+version: 2.4.0-preview+6
 
 environment:
   sdk: ">=3.10.0 <4.0.0"

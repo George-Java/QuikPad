@@ -11,3 +11,4 @@ captures/
 
 # Release binaries are published as GitHub Release assets, not committed.
 dist/*.apk
+dist/*.ipa

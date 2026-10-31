@@ -1,4 +1,45 @@
-# QuikPad 2.3.0 · Flutter 测试构建
+# QuikPad 2.4.0 preview
+
+- 文件：[QuikPad-2.4.0-preview.apk](QuikPad-2.4.0-preview.apk)
+- 包名：`com.yg.liquidink`
+- 版本：`2.4.0-preview (versionCode 6)`
+- 最低系统：Android 8.0（API 26）
+- 目标：Android 15（API 35）
+- ABI：arm64-v8a / armeabi-v7a / x86_64（通用 APK）
+- 大小：61,686,653 bytes（约 58.83 MiB）
+- SHA-256：`914AB33E3A618D2FC2F4A94B52466A186A25EA245C47F31F623E847A480312E0`
+
+> 本地预览构建，已安装到 PLQ110 验收；未提交、未发布到 GitHub Releases。
+
+## 2.4 新增
+
+- 编辑器内搜索栏支持上一个/下一个、匹配计数和循环切换，不再只定位第一处。
+- 搜索从右上角“更多”进入；搜索栏保留焦点，切换匹配后继续输入不会误改文档。
+- 版本号升级为 `2.4.0-preview (6)`。
+
+```bash
+adb install -r QuikPad-2.4.0-preview.apk
+```
+
+## iOS 2.4.0 preview（未签名）
+
+- 文件：[QuikPad-2.4.0-preview-unsigned.ipa](QuikPad-2.4.0-preview-unsigned.ipa)
+- 显示名：`QuikPad`
+- Bundle ID：`com.yg.liquidink`
+- iOS 版本：`2.4.0 (6)`（应用内显示 2.4.0 preview）
+- 最低系统：iOS 15.0
+- 架构：iPhoneOS arm64（真机包，非模拟器）
+- 大小：9,965,698 bytes（约 9.5 MiB）
+- SHA-256：`9021B2D2BC1DF42D939BD9BD0C3B7D314F91F6322DF07C5D3421355389EA5C7F`
+
+> 该 IPA 由 macOS 14 runner 上的 `flutter build ios --release --no-codesign` 构建，
+> 没有 Apple 开发者证书签名，**不能直接安装到未越狱 iPhone**。请用
+> Sideloadly / AltStore 以 Apple ID 自签，或在 Xcode 中选择自己的开发团队后
+> 重新签名安装；App Store/TestFlight 需要有效的 Apple Developer 账号和描述文件。
+
+---
+
+## QuikPad 2.3.0 · Flutter 测试构建
 
 - 文件：[QuikPad-2.3.0-fixed.apk](https://github.com/George-Java/QuikPad/releases/download/v2.3.0/QuikPad-2.3.0-fixed.apk)（GitHub Releases 资产，不在 Git 树中）
 - 包名：`com.yg.liquidink`
@@ -46,4 +87,4 @@ release 构建，R8 压缩，使用本机 Android Debug 证书签名。适合本
 - [QuikPad 2.3 修复报告](../docs/QUIKPAD_2_3.md)
 - [Flutter 重构记录](../docs/FLUTTER_REWRITE.md)
 
-更早的 1.0 Compose、2.0/2.1/2.2 构建保存在 `legacy/`，仅用于回滚。
+2.3.0 之前的 APK 已清理；保留修复前的 `QuikPad-2.3.0.apk` 和 `QuikPad-2.3.0-fixed.apk` 用于对比。

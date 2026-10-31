@@ -43,10 +43,10 @@ shaders/         liquid_glass.frag
 From this directory, using the local SDK in this workspace:
 
 ```powershell
-..\.tooling\flutter-sdk\flutter\bin\flutter.bat pub get
-..\.tooling\flutter-sdk\flutter\bin\flutter.bat analyze
-..\.tooling\flutter-sdk\flutter\bin\flutter.bat test
-..\.tooling\flutter-sdk\flutter\bin\flutter.bat build apk --release
+flutter pub get
+flutter analyze
+flutter test
+flutter build apk --release
 ```
 
 Current result: `flutter analyze` 0 issues; `flutter test` 69 passed, 1 skipped
@@ -54,12 +54,14 @@ Current result: `flutter analyze` 0 issues; `flutter test` 69 passed, 1 skipped
 atomic and serialized document saves, editor dialog lifecycle, task-line
 provenance in quotes and code fences, image decode aspect ratio, normal-IME
 flags for Android skins that otherwise raise a black secure keyboard, the
-editor toolbar relocation and two-back focus-mode exit, large-text
-accessibility layout, and the existing parser/scroll/glass suites. The release
-build was installed and exercised over USB on a physical PLQ110 (Android 17);
-ZMR traces are under `traces/` and ignored by git.
+editor toolbar relocation, two-back focus-mode exit, multi-match search
+cycling, large-text accessibility layout, and the existing parser/scroll/glass
+suites. The release build was installed and exercised over USB on a physical
+PLQ110 (Android 17); ZMR traces are under `traces/` and ignored by git.
 
-The release APK is published as a GitHub Releases asset:
+The current `2.4.0-preview` build is local at
+`../dist/QuikPad-2.4.0-preview.apk` (not published to GitHub).
+The `2.3.0` stable release remains at
 https://github.com/George-Java/QuikPad/releases/download/v2.3.0/QuikPad-2.3.0-fixed.apk
 See `../docs/QUIKPAD_2_3.md` for the edge-line root cause, HTML/image/highlighting
 details, and device acceptance notes.

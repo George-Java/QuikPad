@@ -1,4 +1,4 @@
-# QuikPad 2.3 · Flutter
+# QuikPad 2.4 preview · Flutter
 
 > 一个无需登录、打开即用的本地 Markdown 阅读与编辑器。所有文档、图片和设置都留在本机；不初始化云端，不上传内容。
 
@@ -66,7 +66,7 @@ Android 的 SAF 单文件授权通常不允许读取同级文件；如果直接�
 
 ## 本轮稳定性修复
 
-- **原生编辑对话框**：查找、重命名、新建共用 `showTextPromptDialog`，由对话框自身持有并释放 `TextEditingController`。此前在 `showDialog` 返回后立刻 dispose，而退出动画中的 `TextField` 仍持有控制器，会触发 “A TextEditingController was used after being disposed”。
+- **原生编辑对话框**：重命名、新建共用 `showTextPromptDialog`，由对话框自身持有并释放 `TextEditingController`。此前在 `showDialog` 返回后立刻 dispose，而退出动画中的 `TextField` 仍持有控制器，会触发 “A TextEditingController was used after being disposed”。
 - **图片比例**：解码改用 `ResizeImagePolicy.fit`，宽高上限只做边界，不再把竖向/方形图片压进屏幕宽 × 260dp 的固定比例；所有 Markdown 图片统一 `BoxFit.contain`，不裁切。
 - **任务勾选行号**：任务定位支持引用块（`> - [ ]`）、嵌套列表，以及跳过围栏代码中的假任务行；定位时同时校验任务文本（含实体/转义），避免 HTML 复选框或相邻任务劫持行号；无法确认时放弃修改而不是改错行。
 - **保存一致性**：先写 `.saving` 临时文件再重命名覆盖，进程在写入中被杀不会留下截断的唯一副本；同名重命名成为无操作，不再生成 `-2` 副本；编辑器对并发/排队的保存串行化，并在写入过程中文本被改回时补写磁盘状态。
@@ -74,6 +74,7 @@ Android 的 SAF 单文件授权通常不允许读取同级文件；如果直接�
 - **无障碍大字号**：首页英雄区按钮在文字放大或窄屏时改为纵向排列，按钮标签可省略；320dp 宽度 / 2×–3× 字体下无 RenderFlex 溢出。
 - **移动端输入**：源码编辑器和文件名/查找输入框关闭 iOS 智能引号与破折号替换，避免把 Markdown 引号改成弯引号；同时保留系统输入法的建议/纠错标记。OPPO/OnePlus 会把“无建议”文本框识别成安全密码输入并拉起全屏黑色安全键盘，真机验收时新建、查找、重命名和源码编辑均因它整屏变黑；现在使用普通 IME，键盘与编辑器正常显示。
 - **编辑器工具栏**：查找、专注模式移入右上角“更多”菜单；查看文档时不再显示搜索、设置、全屏按钮，底部只保留模式切换和字数统计。专注模式隐藏上下工具栏，连续两次返回才退出（2 秒窗口）；第一次返回只提示“再按一次”，避免误触直接退出。
+- **多匹配查找**：编辑器内搜索栏支持上一个/下一个、匹配计数（如 `3/100`）和循环切换；切换匹配时自动切到源码页并选中，焦点仍留在搜索框，继续输入不会误改文档。
 - **弹层高度**：底部玻璃弹层最高占屏幕 86% 并内部滚动，文档菜单的“删除本地副本”不再被屏幕底边裁掉。
 - **启动与编辑保护**：外链打开、剪贴板复制、异步重命名/统计增加异常与 `mounted` 保护；字数统计对大文档改为防抖 + isolate 计算，避免每次按键同步扫描整篇文本。
 - **本地隐私**：Android 关闭 Auto Backup，防止系统云备份把“只在本机”的文档副本上传。
@@ -86,35 +87,38 @@ Android 的 SAF 单文件授权通常不允许读取同级文件；如果直接�
 - 液态玻璃开关、低/中/高强度、顶部高光、折射与实时预览。
 - 界面动效开关；遵循系统“减少动态效果”。
 - 本地工作副本、自动保存、保存、导出/另存为、重命名、删除。
-- 查找、格式快捷键、专注模式、字数/行数/阅读时长。
+- 多匹配查找（上一个/下一个/循环）、格式快捷键、专注模式、字数/行数/阅读时长。
 - 无账号、无云端初始化、无网络启动依赖。
 
 ## 验证
 
 ```bash
 cd flutter_app
-..\.tooling\flutter-sdk\flutter\bin\flutter.bat analyze
-..\.tooling\flutter-sdk\flutter\bin\flutter.bat test
-..\.tooling\flutter-sdk\flutter\bin\flutter.bat build apk --release
+flutter analyze
+flutter test
+flutter build apk --release
 ```
 
 - `flutter analyze`：**0 issues**
 - `flutter test`：**69 passed，1 skipped**
   - 1 个 skipped 是宿主不暴露 Impeller shader image filter，不是应用失败。
   - 覆盖 1200+ 块目录跳转、900 项列表、长代码、长段落、长表格、源码分段编辑、HTML 头/链接/锚点、图片相对路径与宽高比、任务勾选行号（引用/代码围栏/嵌套任务）、原生编辑器对话框生命周期、原子保存与并发保存、专注模式两次返回、20+ 代码语言、暗色玻璃边缘与非交互卡片稳定性。
-- Release APK：[QuikPad-2.3.0-fixed.apk](https://github.com/George-Java/QuikPad/releases/download/v2.3.0/QuikPad-2.3.0-fixed.apk)（GitHub Releases，真机验收构建）
+- 本地预览 APK：[`dist/QuikPad-2.4.0-preview.apk`](dist/QuikPad-2.4.0-preview.apk)（未提交、未发布到 GitHub）
 - 包名：`com.yg.liquidink`
-- 版本：`2.3.0 (5)`
-- 大小：61,621,029 bytes（约 58.8 MiB）
-- SHA-256：`3194463BBB96BC3BEF1D660D0AED934A62174E8B306063FA7A3739136338A4B2`
+- 版本：`2.4.0-preview (6)`
+- 大小：61,686,653 bytes（约 58.83 MiB）
+- SHA-256：`914AB33E3A618D2FC2F4A94B52466A186A25EA245C47F31F623E847A480312E0`
+- 稳定版 2.3.0 仍在 GitHub Releases：`QuikPad-2.3.0-fixed.apk`（61,621,029 bytes）
+- iOS 预览包：[`dist/QuikPad-2.4.0-preview-unsigned.ipa`](dist/QuikPad-2.4.0-preview-unsigned.ipa)（iPhoneOS arm64，iOS 15+，9,965,698 bytes，SHA-256 `9021B2D2BC1DF42D939BD9BD0C3B7D314F91F6322DF07C5D3421355389EA5C7F`）
+  - 在 macOS 14 runner 上用 `flutter build ios --release --no-codesign` 构建；没有 Apple 开发者证书签名，需用 Sideloadly/AltStore 以 Apple ID 自签，或在 Xcode 选择自己的团队重新签名。
 
 ## 真机验收
 
 - 设备：`PLQ110`（Android 17，1272×2800，USB 连接）。
-- 安装：从 Releases 下载 `QuikPad-2.3.0-fixed.apk`，再执行 `adb install -r QuikPad-2.3.0-fixed.apk`。
+- 安装：`adb install -r dist/QuikPad-2.4.0-preview.apk`（2.3.0 稳定版仍可从 Releases 下载）。
 - Zeno Mobile Runner 0.2.18（从源码构建的 Windows `zmr.exe`）：3 个场景在物理设备上 `passed`，含 launch、healthy、snapshot、点按和返回；trace 位于 `flutter_app/traces/zmr-phone*`。
-- 手工验收：新建/查找/重命名窗口与键盘正常；源码编辑可输入；`> - [ ]` 引用任务只改自己的 `[x]`（`task-test.md` 验证）；关联 Markdown 目录后 300×1200 竖图按 1:4 显示；1.5× 系统字体首页无溢出；查找与专注模式从右上角菜单进入，专注模式第一次返回只提示、第二次返回退出；删除文档返回首页。
-- 注意：`dist/QuikPad-2.3.0.apk` 是修复前构建，保留用于对比；`QuikPad-2.3.0-fixed.apk` 作为 Releases 资产，不进入 Git；`traces/` 含手机截图，已在 `flutter_app/.gitignore` 中忽略。
+- 手工验收：新建/查找/重命名窗口与键盘正常；源码编辑可输入；`> - [ ]` 引用任务只改自己的 `[x]`（`task-test.md` 验证）；关联 Markdown 目录后 300×1200 竖图按 1:4 显示；1.5× 系统字体首页无溢出；查找与专注模式从右上角菜单进入，专注模式第一次返回只提示、第二次返回退出；2.4.0 搜索栏在 100 个匹配间循环切换、计数与上下箭头正常；删除文档返回首页。
+- 注意：`dist/QuikPad-2.3.0.apk` 是修复前构建，保留用于对比；`QuikPad-2.3.0-fixed.apk` 作为 Releases 资产；2.3.0 之前的 APK 已从 `dist/legacy` 清理；`traces/` 含手机截图，已在 `flutter_app/.gitignore` 中忽略。
 
 ## 目录
 

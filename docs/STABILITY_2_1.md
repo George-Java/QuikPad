@@ -15,7 +15,7 @@
 在 `flutter_app/` 执行：
 
 ```powershell
-..\.tooling\flutter-sdk\flutter\bin\flutter.bat test test/large_document_test.dart --reporter expanded
+flutter test test/large_document_test.dart --reporter expanded
 ```
 
 修复前的四项压力断言全部失败，日志保存在 `.tooling/large-document-before.log`：

@@ -14,7 +14,7 @@ The root `app/` and Gradle project contain archived Kotlin/Compose 1.x code. `do
 
 ## Build, Test, and Development Commands
 
-Run these from `flutter_app/` with Flutter on `PATH`. On this Windows workspace, substitute `..\.tooling\flutter-sdk\flutter\bin\flutter.bat` for `flutter`; see the root `README.md` for JDK and Android SDK setup.
+Run these from `flutter_app/`; Flutter 3.47.9 is installed at `E:\BuildTools\flutter` and is on `PATH`. The Android SDK lives at `E:\AndroidSDK` (Gradle JDK: `E:\JDK21`); see the root `README.md` for details.
 
 - `flutter pub get`: resolve dependencies.
 - `flutter run`: launch on a connected Android device or emulator.

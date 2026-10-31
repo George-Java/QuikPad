@@ -129,11 +129,12 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('search dialog does not dispose its controller early', (
+  testWidgets('search cycles matches and wraps in the document', (
     tester,
   ) async {
     final store = ActionStore();
-    await openEditor(tester, store, text: 'hello world\n\nsecond paragraph');
+    const text = 'alpha one\n\nalpha two\n\nalpha three';
+    await openEditor(tester, store, text: text);
 
     // Search, settings and fullscreen no longer consume editor chrome space.
     expect(find.byTooltip('查找文本'), findsNothing);
@@ -144,15 +145,54 @@ void main() {
     await pumpFor(tester, 400);
     await tester.tap(find.text('查找文本'));
     await pumpFor(tester, 400);
-    await tester.enterText(find.byType(TextField).last, 'world');
-    await tester.tap(find.widgetWithText(FilledButton, '查找'));
-    await pumpFor(tester, 600);
 
-    final field = tester.widget<TextField>(find.byType(TextField).first);
-    expect(field.controller!.text, contains('hello world'));
-    expect(field.controller!.selection.start, 6);
-    expect(field.controller!.selection.end, 11);
+    final searchField = find.byKey(const Key('editor-search-field'));
+    expect(searchField, findsOneWidget);
+    await tester.enterText(searchField, 'alpha');
+    await pumpFor(tester, 400);
+    expect(find.text('1/3'), findsOneWidget);
+
+    TextEditingController sourceController() => tester
+        .widgetList<TextField>(find.byType(TextField))
+        .firstWhere((field) => field.key != const Key('editor-search-field'))
+        .controller!;
+    final positions = <int>[];
+    var from = 0;
+    while (true) {
+      final at = text.indexOf('alpha', from);
+      if (at < 0) break;
+      positions.add(at);
+      from = at + 1;
+    }
+    expect(sourceController().selection.start, positions[0]);
+
+    await tester.tap(find.byTooltip('下一个匹配'));
+    await pumpFor(tester, 300);
+    expect(find.text('2/3'), findsOneWidget);
+    expect(sourceController().selection.start, positions[1]);
+    expect(tester.widget<TextField>(searchField).focusNode!.hasFocus, isTrue);
+
+    await tester.tap(find.byTooltip('下一个匹配'));
+    await pumpFor(tester, 300);
+    expect(find.text('3/3'), findsOneWidget);
+    expect(sourceController().selection.start, positions[2]);
+
+    await tester.tap(find.byTooltip('下一个匹配'));
+    await pumpFor(tester, 300);
+    expect(find.text('1/3'), findsOneWidget);
+    expect(sourceController().selection.start, positions[0]);
+
+    await tester.tap(find.byTooltip('上一个匹配'));
+    await pumpFor(tester, 300);
+    expect(find.text('3/3'), findsOneWidget);
+    expect(sourceController().selection.start, positions[2]);
     expect(tester.takeException(), isNull);
+
+    // Back closes the in-editor search bar instead of leaving the document.
+    await tester.binding.handlePopRoute();
+    await pumpFor(tester, 300);
+    expect(searchField, findsNothing);
+    expect(find.byTooltip('保存'), findsOneWidget);
   });
 
   testWidgets('focus mode needs two back gestures to exit', (tester) async {

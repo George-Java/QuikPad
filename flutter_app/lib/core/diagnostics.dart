@@ -48,7 +48,7 @@ class AppDiagnostics {
 
   static Future<bool> exportReport() async {
     final report = StringBuffer(
-      'QuikPad 2.3.0 (5)\n${DateTime.now().toIso8601String()}\n',
+      'QuikPad 2.4.0-preview (6)\n${DateTime.now().toIso8601String()}\n',
     );
     report.writeln(
       'Android exit reason: 3=LOW_MEMORY, 4=CRASH, 5=CRASH_NATIVE, 6=ANR, 9=EXCESSIVE_RESOURCE_USAGE, 10=USER_REQUESTED',

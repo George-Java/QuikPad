@@ -226,7 +226,7 @@ class SettingsScreen extends StatelessWidget {
                                 showLicensePage(
                                   context: context,
                                   applicationName: 'QuikPad',
-                                  applicationVersion: '2.3.0',
+                                  applicationVersion: '2.4.0-preview',
                                   applicationLegalese: license,
                                 );
                               },
@@ -234,7 +234,7 @@ class SettingsScreen extends StatelessWidget {
                             ),
                             Center(
                               child: Text(
-                                'QuikPad 2.3.0 · Flutter',
+                                'QuikPad 2.4.0 preview · Flutter',
                                 style: TextStyle(
                                   color: Theme.of(context)
                                       .colorScheme

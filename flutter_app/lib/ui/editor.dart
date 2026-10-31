@@ -66,6 +66,15 @@ class _EditorScreenState extends State<EditorScreen>
   Timer? _statsTimer;
   final ValueNotifier<String> _stats = ValueNotifier<String>('0 字 · 1 行');
 
+  bool _searchOpen = false;
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
+  Timer? _searchDebounce;
+  List<int> _searchMatches = const <int>[];
+  int _searchIndex = 0;
+  bool _searchTruncated = false;
+  static const _searchMatchLimit = 2000;
+
   @override
   void initState() {
     super.initState();
@@ -288,6 +297,10 @@ class _EditorScreenState extends State<EditorScreen>
 
   Future<void> _handleBack() async {
     if (_leaving || _deleting) return;
+    if (_searchOpen) {
+      _closeSearch();
+      return;
+    }
     if (_focusMode) {
       // A single back gesture is easy to trigger by accident. Arm the exit and
       // only leave focus mode when the user confirms with a second back inside
@@ -339,6 +352,7 @@ class _EditorScreenState extends State<EditorScreen>
   }
 
   void _enterFocusMode() {
+    if (_searchOpen) _closeSearch();
     _focusExitTimer?.cancel();
     _focusExitTimer = null;
     _focusExitArmed = false;
@@ -438,7 +452,7 @@ class _EditorScreenState extends State<EditorScreen>
     );
     if (!mounted || action == null) return;
     if (action == 'search') {
-      await _openSearch();
+      _openSearch();
     } else if (action == 'focus') {
       _enterFocusMode();
     } else if (action == 'export') {
@@ -723,35 +737,113 @@ class _EditorScreenState extends State<EditorScreen>
     return index < 0 ? text.length : index;
   }
 
-  Future<void> _openSearch() async {
-    final query = await showTextPromptDialog(
-      context,
-      title: '查找文本',
-      hintText: '输入要查找的内容',
-      confirmLabel: '查找',
-      textInputAction: TextInputAction.search,
-    );
-    if (query == null || query.isEmpty || !mounted) return;
-    final text = _controller.text;
-    final from = _controller.selection.end.clamp(0, text.length).toInt();
-    var index = text.toLowerCase().indexOf(query.toLowerCase(), from);
-    if (index < 0) {
-      index = text.toLowerCase().indexOf(query.toLowerCase());
-    }
-    if (index < 0) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('没有找到“$query”')));
+  void _openSearch() {
+    _searchDebounce?.cancel();
+    if (_searchOpen) {
+      _searchFocus.requestFocus();
       return;
     }
-    setState(() => _mode = EditorMode.source);
-    await WidgetsBinding.instance.endOfFrame;
+    _searchController.clear();
+    setState(() {
+      _searchOpen = true;
+      _mode = _mode == EditorMode.preview ? EditorMode.source : _mode;
+      _searchMatches = const <int>[];
+      _searchIndex = 0;
+      _searchTruncated = false;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _searchFocus.requestFocus();
+    });
+  }
+
+  void _closeSearch() {
+    _searchDebounce?.cancel();
+    _searchFocus.unfocus();
+    _editorFocus.unfocus();
+    _searchController.clear();
     if (!mounted) return;
-    _controller.selection = TextSelection(
-      baseOffset: index,
-      extentOffset: index + query.length,
-    );
-    _editorFocus.requestFocus();
+    setState(() {
+      _searchOpen = false;
+      _searchMatches = const <int>[];
+      _searchIndex = 0;
+      _searchTruncated = false;
+    });
+  }
+
+  void _scheduleSearch() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 120), () {
+      if (!mounted || !_searchOpen) return;
+      _refreshSearch();
+    });
+    setState(() {});
+  }
+
+  void _refreshSearch({bool focus = false}) {
+    final query = _searchController.text;
+    final text = _controller.text;
+    final matches = <int>[];
+    var truncated = false;
+    if (query.isNotEmpty) {
+      final source = text.toLowerCase();
+      final needle = query.toLowerCase();
+      if (needle.isNotEmpty) {
+        var from = 0;
+        while (matches.length < _searchMatchLimit) {
+          final at = source.indexOf(needle, from);
+          if (at < 0) break;
+          matches.add(at);
+          from = at + needle.length;
+        }
+        truncated = matches.length >= _searchMatchLimit;
+      }
+    }
+    var index = 0;
+    if (matches.isNotEmpty) {
+      final cursor = _controller.selection.baseOffset;
+      final atOrAfter = matches.indexWhere((match) => match >= cursor);
+      index = atOrAfter < 0 ? 0 : atOrAfter;
+    }
+    setState(() {
+      _searchMatches = matches;
+      _searchIndex = index;
+      _searchTruncated = truncated;
+    });
+    if (matches.isNotEmpty) _selectSearchMatch(index, focus: focus);
+  }
+
+  void _stepSearch(int delta) {
+    if (_searchMatches.isEmpty) {
+      _refreshSearch(focus: true);
+      return;
+    }
+    final count = _searchMatches.length;
+    final next = (_searchIndex + delta) % count;
+    final index = next < 0 ? next + count : next;
+    setState(() => _searchIndex = index);
+    _selectSearchMatch(index, focus: true);
+    HapticFeedback.selectionClick();
+  }
+
+  void _selectSearchMatch(int index, {bool focus = false}) {
+    if (index < 0 || index >= _searchMatches.length) return;
+    final start = _searchMatches[index];
+    final end = (start + _searchController.text.length)
+        .clamp(0, _controller.text.length)
+        .toInt();
+    _controller.selection = TextSelection(baseOffset: start, extentOffset: end);
+    if (focus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        // Give the source field focus for one frame so Flutter scrolls the
+        // selected match into view, then return focus to the search box so
+        // further typing edits the query instead of the document.
+        _editorFocus.requestFocus();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _searchFocus.requestFocus();
+        });
+      });
+    }
   }
 
   @override
@@ -761,6 +853,9 @@ class _EditorScreenState extends State<EditorScreen>
     _autoSaveTimer?.cancel();
     _statsTimer?.cancel();
     _focusExitTimer?.cancel();
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    _searchFocus.dispose();
     _stats.dispose();
     _controller.removeListener(_onTextChanged);
     _controller.dispose();
@@ -786,6 +881,7 @@ class _EditorScreenState extends State<EditorScreen>
             child: Column(
               children: [
                 if (!_focusMode) _buildTopBar(context),
+                if (!_focusMode && _searchOpen) _buildSearchBar(scheme),
                 Expanded(
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(
@@ -1012,6 +1108,99 @@ class _EditorScreenState extends State<EditorScreen>
       onLinkTap: (url) => unawaited(_openLink(url)),
       onFootnoteTap: (label) => unawaited(_openFootnote(label)),
       onToggleTask: _toggleTask,
+    );
+  }
+
+  Widget _buildSearchBar(ColorScheme scheme) {
+    final query = _searchController.text;
+    final total = _searchMatches.length;
+    final count = query.isEmpty
+        ? ''
+        : total == 0
+        ? '0/0'
+        : '${_searchIndex + 1}/$total${_searchTruncated ? '+' : ''}';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+      child: GlassPanel(
+        borderRadius: 18,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+        child: Material(
+          type: MaterialType.transparency,
+          child: Row(
+            children: [
+              const SizedBox(width: 6),
+              Icon(Icons.search, size: 18, color: scheme.primary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: TextField(
+                  key: const Key('editor-search-field'),
+                  controller: _searchController,
+                  focusNode: _searchFocus,
+                  autofocus: true,
+                  textInputAction: TextInputAction.search,
+                  autocorrect: true,
+                  enableSuggestions: true,
+                  smartQuotesType: SmartQuotesType.disabled,
+                  smartDashesType: SmartDashesType.disabled,
+                  style: const TextStyle(fontSize: 14),
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    border: InputBorder.none,
+                    hintText: '查找文本',
+                  ),
+                  onChanged: (_) => _scheduleSearch(),
+                  onSubmitted: (_) => _stepSearch(1),
+                ),
+              ),
+              if (count.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  child: Text(
+                    count,
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              IconButton(
+                tooltip: '上一个匹配',
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints.tightFor(
+                  width: 32,
+                  height: 32,
+                ),
+                padding: EdgeInsets.zero,
+                icon: const Icon(Icons.keyboard_arrow_up, size: 20),
+                onPressed: total == 0 ? null : () => _stepSearch(-1),
+              ),
+              IconButton(
+                tooltip: '下一个匹配',
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints.tightFor(
+                  width: 32,
+                  height: 32,
+                ),
+                padding: EdgeInsets.zero,
+                icon: const Icon(Icons.keyboard_arrow_down, size: 20),
+                onPressed: total == 0 ? null : () => _stepSearch(1),
+              ),
+              IconButton(
+                tooltip: '关闭查找',
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints.tightFor(
+                  width: 32,
+                  height: 32,
+                ),
+                padding: EdgeInsets.zero,
+                icon: const Icon(Icons.close, size: 18),
+                onPressed: _closeSearch,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
